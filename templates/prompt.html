@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Bedrock Classroom</title>
+    <style>
+        .processing {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Bedrock Classroom</h1>
+
+        <label for="name">Enter a Question</label>
+        <input type="text" id="prompt" name="prompt">
+        <button id="sendButton">送信</button>
+        
+        <p id="answer"></p>
+        <p id="processing" class="processing">ギークくん考え中</p>
+
+    <script>
+
+        document.getElementById('sendButton').addEventListener('click', function() {
+
+            const promptData = document.getElementById('prompt').value;
+
+            let processing = document.getElementById('processing');
+
+            processing.classList.remove('processing');
+
+            document.getElementById("sendButton").disabled = true;
+
+            fetch('/prompt', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({data: promptData})
+
+            })
+
+            .then(response => response.json())
+            .then(data => {
+                processing.classList.add('processing')
+                document.getElementById("answer").textContent = data.data.result;
+            })
+
+            .catch((error) => {
+                console.error('Error', error);
+            });
+
+            document.getElementById("sendButton").disabled = false;
+
+        });
+        
+    </script>
+</body>
+
+</html>
