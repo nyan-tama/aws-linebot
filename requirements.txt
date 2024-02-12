@@ -3,3 +3,4 @@ Flask-HTTPAuth
 psycopg2
 boto3
 gunicorn
+langchain

@@ -1,6 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, jsonify
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import generate_password_hash, check_password_hash
+from langchain_community.llms import Bedrock
+from langchain.chains import RetrievalQA
+from langchain_community.retrievers import AmazonKendraRetriever
+from langchain.prompts import PromptTemplate
 import psycopg2
 import psycopg2.extras
 import os
@@ -102,6 +106,48 @@ def add_greeting():
     finally:
         conn.close()
     return redirect(url_for('index'))
+
+@app.route('/prompt', methods=['GET'])
+def prompt():
+    
+    return render_template('prompt.html')
+
+@app.route('/prompt', methods=['POST'])
+def send_prompt():
+    
+    # ajaxで送信されてきた形式のデータから、文字列取得
+    data = request.json['data']
+    
+    kendra_index_id="c5b2f02b-2398-4197-ae9b-a74fea066f5d"
+    attribute_filter = {"EqualsTo": {"Key": "_language_code","Value": {"StringValue": "ja"}}}
+    retriever = AmazonKendraRetriever(index_id=kendra_index_id,attribute_filter=attribute_filter,top_k=20)
+
+    llm =  Bedrock(
+        model_id="anthropic.claude-v2:1",
+        model_kwargs={"max_tokens_to_sample": 1000}
+    )
+
+    prompt_template = """
+
+    <documents>{context}</documents>
+    \n\nHuman: あなたはギークくんという名前の秋葉原のマスコットキャラクターです。
+        <documents>タグに示されている情報を元に、<question>に対して説明してください。言語の指定が無い場合は日本語で答えてください。
+        もし<question>タグの内容が参考文書に無かった場合は「文書にありません」と答えてください。回答に<documents>タグの内容や、<question>タグの内容を含めないでください。
+        引用元はのURLは表示しないでください。「文書によると」などの表現を回答の始めに絶対に使用しないでください。なるべく親しげに、明るく元気な文体で答えるようにしてください。
+    <question>{question}</question>
+    \n\nAssistant:
+"""
+
+    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+    chain_type_kwargs = {"prompt": prompt}
+
+    # Chainの定義
+    qa = RetrievalQA.from_chain_type(retriever=retriever,llm=llm,chain_type_kwargs=chain_type_kwargs)
+
+    # chainの実行
+    answer = qa.invoke(data)
+    
+    return jsonify({'data': answer})
 
 if __name__ == "__main__":
     app.run(debug=True)
